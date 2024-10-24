@@ -6,7 +6,7 @@ from scipy.signal import freqz, butter, filtfilt
 import os
 from datetime import datetime
 
-from generador_de_senales import setup_directories, generate_linear_chirp
+from signal_generator import setup_directories, generate_linear_chirp
 
 
 def analyze_frequency_response(
@@ -297,6 +297,76 @@ def analyze_bandwidth_vs_sampling(
     plt.grid(True)
     plt.legend()
     plt.show()
+
+def analyze_amplitude_linearity(
+        input_file,
+        output_file,
+        n_levels=5,
+        sample_rate=48000
+):
+    """
+    Analiza la linealidad de la respuesta en amplitud del sistema.
+
+    Parameters:
+    -----------
+    input_file : str
+        Archivo de entrada con test de amplitudes
+    output_file : str
+        Archivo de salida correspondiente
+    n_levels : int
+        Número de niveles de amplitud en el test
+    sample_rate : int
+        Frecuencia de muestreo
+    """
+    # Leer archivos
+    _, input_signal = wavfile.read(input_file)
+    _, output_signal = wavfile.read(output_file)
+
+    # Convertir a float
+    input_signal = input_signal / 32767.0
+    output_signal = output_signal / 32767.0
+
+    # Calcular RMS por segmento
+    samples_per_segment = len(input_signal) // n_levels
+    input_rms = []
+    output_rms = []
+
+    for i in range(n_levels):
+        start = i * samples_per_segment
+        end = (i + 1) * samples_per_segment
+
+        input_rms.append(np.sqrt(np.mean(input_signal[start:end] ** 2)))
+        output_rms.append(np.sqrt(np.mean(output_signal[start:end] ** 2)))
+
+    # Visualización
+    plt.figure(figsize=(10, 8))
+
+    # Gráfico de entrada vs salida
+    plt.subplot(2, 1, 1)
+    plt.plot(input_rms, output_rms, 'bo-', label='Medido')
+    plt.plot([0, max(input_rms)], [0, max(output_rms)], 'r--', label='Lineal Ideal')
+    plt.title('Análisis de Linealidad')
+    plt.xlabel('Amplitud de Entrada (RMS)')
+    plt.ylabel('Amplitud de Salida (RMS)')
+    plt.grid(True)
+    plt.legend()
+
+    # Gráfico de desviación de la linealidad
+    ideal_gain = output_rms[-1] / input_rms[-1]
+    deviation = np.array(output_rms) - np.array(input_rms) * ideal_gain
+
+    plt.subplot(2, 1, 2)
+    plt.plot(input_rms, deviation, 'go-')
+    plt.axhline(y=0, color='r', linestyle='--')
+    plt.title('Desviación de la Linealidad')
+    plt.xlabel('Amplitud de Entrada (RMS)')
+    plt.ylabel('Desviación')
+    plt.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+    return input_rms, output_rms, deviation
 
 
 # Ejemplo de uso
